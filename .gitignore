@@ -1,0 +1,47 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editor and OS metadata
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local agent metadata and instructions
+/AGENTS.md
+/.agents/
+/.codex/
+
+# Local lab inputs/outputs
+/auth.log
+/access.log
+/scan.xml
+/hosts.json
+/scanner_results.json
+/auth_results.json
+/web_results.json
+/report.md
+/recon_*/
+/*.log
+
+# Local reference/ad hoc files; keep on disk, do not publish by default
+/*[Aa]utomation*.pdf
+/json
+/json1
