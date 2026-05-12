@@ -1,0 +1,58 @@
+{
+  "target": "scanme.nmap.org",
+  "mode": "domain",
+  "timestamp": "2026-05-11T18:45:02",
+  "whois": {
+    "success": true,
+    "registrar": "MarkMonitor, Inc.",
+    "creation_date": "1999-09-15T04:00:00Z",
+    "expiry_date": "2025-09-14T04:00:00Z",
+    "registrant_organization": null,
+    "error": null
+  },
+  "dig": {
+    "A": {
+      "success": true,
+      "records": [
+        "45.33.32.156"
+      ],
+      "error": null
+    },
+    "MX": {
+      "success": true,
+      "records": [],
+      "error": null
+    },
+    "NS": {
+      "success": true,
+      "records": [
+        "ns1.linode.com.",
+        "ns2.linode.com.",
+        "ns3.linode.com.",
+        "ns4.linode.com.",
+        "ns5.linode.com."
+      ],
+      "error": null
+    },
+    "TXT": {
+      "success": true,
+      "records": [
+        "\"Try Nmap at: https://nmap.org/try/\""
+      ],
+      "error": null
+    }
+  },
+  "curl": {
+    "success": true,
+    "headers": {
+      "Server": "Apache/2.4.7 (Ubuntu)",
+      "X-Powered-By": "PHP/5.5.9-1ubuntu4.14"
+    },
+    "missing_security_headers": [
+      "Content-Security-Policy",
+      "Strict-Transport-Security",
+      "X-Frame-Options"
+    ],
+    "error": null
+  }
+}

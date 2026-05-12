@@ -1,6 +1,6 @@
-# automation-scripts
+# Automation-Scripts
 
-## By: Sebastian Buitrago & Juan Esteban Cely
+## Sebastian Buitrago & Juan Esteban Cely
 
 Python 3.12 scripts for SPTI workshop 15 - Automation. The project automates TCP scanning, nmap XML parsing, log analysis, anomaly detection, and integrated reconnaissance with auditable output.
 
@@ -35,14 +35,17 @@ uv run python scanner.py 127.0.0.1 --ports 22,80,443 --output scanner_results.js
 
 uv run python parse_scan.py --input scan.xml --output hosts.json --ssh-timeout 5
 
-uv run python auth_analysis.py --input auth.log --output auth_results.json
+uv run python auth_analysis.py --input auth.log --output auth_results.json --threshold 10
 
 uv run python log_analysis.py --input access.log --output web_results.json --report report.md
 
 uv run python recon.py 127.0.0.1 --mode ip --output sample_output --verbose
 ```
 
-`sample_output/` was generated safely against `127.0.0.1`. In this environment `nmap` and `dig` succeeded, while `whois` was not installed; that real tool error is preserved in `sample_output/audit.log` and `sample_output/results.json`.
+`sample_output/` contains two real runs:
+
+- **IP mode** (`sample_output/`): run against `127.0.0.1`. `nmap` and `dig` succeeded; `whois` was not installed and that error is preserved in `audit.log` and `results.json`.
+- **Domain mode** (`sample_output/domain/`): run against `scanme.nmap.org` (Nmap's official scan-me host, publicly listed for this purpose). All tools succeeded; three missing security headers were found and reported.
 
 ## Scripts
 
@@ -62,10 +65,83 @@ uv run python recon.py 127.0.0.1 --mode ip --output sample_output --verbose
 
 ## Concept Questions
 
-- High concurrency can cause false negatives because local socket limits, packet loss, target rate limits, or short timeouts can make open ports fail to complete a connection. "Not detected" is not the same as "closed"; scanner output should be treated as evidence with limits, including nmap output.
-- Service banners and versions help attackers map software to known CVEs and exploit paths. `Apache httpd 2.4.54` gives more actionable intelligence than a server that hides its version, although hidden banners do not prove the service is safe.
-- A single global 3-sigma baseline can be noisy when traffic has daily cycles. A better approach is to compare each hour against the same hour on previous days or maintain separate baselines for business hours, nights, and weekends.
-- Active reconnaissance sends packets to the target and is visible to network monitoring. Passive reconnaissance, such as querying Shodan, uses existing third-party observations and is harder for the target defender to detect, but it may be stale or incomplete.
+### Part 1 — False negatives at high concurrency
+
+At very high concurrency (e.g. `--rate 2000`), the operating system can exhaust its
+per-process file-descriptor limit and its ephemeral port range before all scan tasks
+complete. When the kernel cannot allocate a new socket it raises `OSError` immediately,
+which the scanner catches and interprets as "port closed." The port was never actually
+tested — the connection attempt failed locally, not at the target.
+
+This means "not detected" and "closed" are categorically different claims. A scanner
+reports what was observable within its resource and timing constraints. Any tool,
+including nmap, can produce false negatives when configured too aggressively, when a
+stateful firewall silently drops packets, when the target itself is rate-limiting
+incoming SYNs, or when a per-host timeout is shorter than the network round-trip time.
+Scan results are evidence with a confidence level attached to them, not ground truth.
+In practice this means always interpreting results conservatively: a port that did not
+respond should be re-tested at a lower rate before being reported as closed.
+
+### Part 2 — Service version banners and attacker intelligence
+
+A banner like `Apache httpd 2.4.54 (Ubuntu)` immediately maps to a specific row in
+public vulnerability databases such as the NVD and Exploit-DB. An attacker can query
+those databases in seconds and learn which CVEs are unpatched on that exact version,
+whether a public exploit exists, and whether the default configuration is vulnerable.
+The version string converts a generic "there is an HTTP server" observation into an
+actionable attack plan without sending a single additional probe.
+
+A server that returns only `Server: Apache`, or no `Server` header at all, forces the
+attacker to perform active version fingerprinting — sending probe requests and
+correlating responses against a signature database. That process is slower, generates
+more traffic, and is easier for a defender to detect and block. Hiding the version is
+not a fix for the underlying vulnerability, but it raises the cost of exploitation and
+reduces the value of passive reconnaissance against that host.
+
+### Part 3 — Limits of a global 3-sigma baseline for web traffic
+
+The 3-sigma rule assumes the data is approximately normally distributed around a single
+mean. Web traffic almost never is: servers that handle business users see several
+thousand requests per hour during the working day and a few dozen overnight. A global
+baseline computed across all 24 hours merges those two very different populations,
+which inflates the standard deviation artificially. The resulting threshold is too
+permissive during peak hours (a genuine attack spike blends into normal load) and too
+sensitive at night (a modest increase over the low overnight baseline triggers a
+false positive).
+
+A more robust approach segments the baseline by time stratum before computing
+statistics. The simplest version compares each hour only against the same clock-hour
+on previous days: the 3:00 AM reading on Tuesday is compared against 3:00 AM on
+Monday, Sunday, Saturday, and so on. This normalises the daily cycle before measuring
+deviation, so the threshold adapts to what is actually expected at that time rather
+than averaging over the entire day. More sophisticated approaches build separate
+models for weekdays vs. weekends, or use time-series decomposition to remove the
+seasonal component before applying anomaly detection.
+
+### Part 4 — Active vs. passive reconnaissance
+
+Active reconnaissance (this tool, nmap) sends packets directly from your IP to the
+target. Every probe leaves a trace: DNS resolvers log the query source, web servers
+log the `curl -I` request, and network monitoring infrastructure at the target sees
+your IP's SYNs arrive. A defender with a SIEM or IDS can correlate those events,
+identify the scan pattern within seconds, and block or alert on your IP. Active recon
+produces current, authoritative data — you see what is reachable right now — but it
+is inherently visible.
+
+Passive reconnaissance (Shodan) queries a third-party database that was built from
+scans run months or years ago by Shodan's own infrastructure. Your IP never touches
+the target. There is no packet to log, no connection to detect, no alert to trigger.
+From a defender's perspective it is undetectable because nothing happens on their
+network. The trade-off is staleness and incompleteness: Shodan may not have scanned
+a given host recently, may have missed hosts behind NAT or firewalls, and does not
+reflect configuration changes made since the last crawl.
+
+In a real engagement both are used sequentially. Passive recon first: query Shodan
+and public DNS records to build a target map without alerting anyone. Active recon
+second: confirm reachability and fill gaps where Shodan's data is stale or absent,
+only after the engagement scope and rules of engagement are confirmed in writing.
+For particularly sensitive targets (ICS/SCADA, production financial systems) passive-
+only recon may be the appropriate choice even during an authorised assessment.
 
 ## Ethics
 

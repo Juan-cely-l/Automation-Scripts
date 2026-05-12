@@ -81,12 +81,20 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Analyze Linux sshd authentication logs")
     parser.add_argument("--input", default="auth.log", help="Authentication log path")
     parser.add_argument("--output", help="Optional JSON output path")
+    parser.add_argument(
+        "--threshold",
+        type=int,
+        default=10,
+        help="Minimum failed attempts to flag an IP as suspicious (default: 10)",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = create_parser().parse_args(argv)
-    result = analyze_auth_log(args.input)
+    if args.threshold < 1:
+        create_parser().error("--threshold must be at least 1")
+    result = analyze_auth_log(args.input, args.threshold)
     write_json(result, args.output)
     return 0
 
